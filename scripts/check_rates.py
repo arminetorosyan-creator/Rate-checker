@@ -187,10 +187,33 @@ def format_slack_message(averages: dict, as_of: str) -> str:
     return "\n".join(lines)
 
 
+def format_email_subject(as_of: str) -> str:
+    return f"rate.am daily AMD rates — {as_of}"
+
+
+def format_email_body(averages: dict, as_of: str) -> str:
+    def line(kind, currency):
+        d = averages.get(kind, {}).get(currency, {})
+        buy, sell, n = d.get("buy"), d.get("sell"), d.get("n", 0)
+        if buy is None or sell is None:
+            return f"  {currency.upper()}: n/a (0 sources)"
+        return f"  {currency.upper()}: buy {buy} / sell {sell} AMD  ({n} sources)"
+
+    lines = [f"rate.am daily AMD rates — {as_of}", "", "Banks (avg)"]
+    lines.append(line("banks", "usd"))
+    lines.append(line("banks", "eur"))
+    lines.append("")
+    lines.append("Exchange offices (avg)")
+    lines.append(line("exchange", "usd"))
+    lines.append(line("exchange", "eur"))
+    return "\n".join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default=RATES_URL, help="Page to fetch (default: %(default)s)")
     parser.add_argument("--slack", action="store_true", help="Print Slack-ready text instead of JSON")
+    parser.add_argument("--email", action="store_true", help="Print email-ready text (Subject: line + body) instead of JSON")
     parser.add_argument("--debug", action="store_true", help="Print detected sections/rows for troubleshooting")
     parser.add_argument("--html-file", help="Parse a locally saved HTML file instead of fetching")
     args = parser.parse_args()
@@ -222,6 +245,10 @@ def main():
 
     if args.slack:
         print(format_slack_message(averages, as_of))
+    elif args.email:
+        print(f"Subject: {format_email_subject(as_of)}")
+        print()
+        print(format_email_body(averages, as_of))
     else:
         print(json.dumps({"date": as_of, **averages}, indent=2))
 
